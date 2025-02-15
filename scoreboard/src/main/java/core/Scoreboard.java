@@ -1,45 +1,41 @@
 package core;
 
 import core.domain.Match;
+import core.persistence.MatchRepository;
+import core.service.OutputService;
 
-import java.util.*;
 import java.util.stream.Collectors;
 
 public class Scoreboard {
-	Queue<Match> matchList = new PriorityQueue<>();
-	Map<String, Boolean> teams = new HashMap<>();
+
+	MatchRepository matchRepository;
+	OutputService outputService;
+
+	public Scoreboard(MatchRepository matchRepository, OutputService outputService) {
+		this.matchRepository = matchRepository;
+		this.outputService = outputService;
+	}
 
 	public void startGame(String homeTeam, String awayTeam) {
-		if (teams.containsKey(homeTeam) || teams.containsKey(awayTeam)) {
-			throw new IllegalArgumentException("There is already an ongoing match played by one of the teams.");
-		}
 		Match match = new Match(homeTeam, awayTeam);
-		teams.put(homeTeam, true);
-		teams.put(awayTeam, true);
-		matchList.add(match);
+		matchRepository.addMatch(match);
 	}
 
 	public void finishGame(String homeTeam, String awayTeam) {
-		boolean removed = matchList
-				.removeIf(match -> match.getHomeTeam().equals(homeTeam) && match.getAwayTeam().equals(awayTeam));
-		if (removed) {
-			teams.remove(homeTeam);
-			teams.remove(awayTeam);
+		Match match = matchRepository.getMatch(homeTeam, awayTeam);
+		if (match != null) {
+			matchRepository.removeMatch(match);
 		}
 	}
 
 	public void updateScore(String homeTeam, String awayTeam, int homeScore, int awayScore) {
-		if (homeScore < 0 || awayScore < 0) {
-			throw new IllegalArgumentException("homeScore and awayScore need to be non-negative integers. Were: %s, %s"
-					.formatted(homeScore, awayScore));
-		}
-		matchList.stream().filter(m -> m.getHomeTeam().equals(homeTeam) && m.getAwayTeam().equals(awayTeam)).findFirst()
-				.ifPresent(value -> value.updateScore(homeScore, awayScore));
+		Match match = matchRepository.getMatch(homeTeam, awayTeam);
+		match.updateScore(homeScore, awayScore);
+		matchRepository.updateMatch(match);
 	}
 
-	public String showSummary() {
-		String s = matchList.stream().map(Match::toString).collect(Collectors.joining("\n"));
-		System.out.println(s);
-		return s;
+	public void showSummary() {
+		outputService
+				.showSummary(matchRepository.getMatches().stream().map(Match::toString).collect(Collectors.toList()));
 	}
 }
